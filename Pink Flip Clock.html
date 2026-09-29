@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flip Clock</title>
+<style>
+:root{--bg:#FADBD8;--card:#5D3A3A;--digit:#FFF5F3;--text:#3B1F1F;--font:'Poppins',system-ui,sans-serif;--h:clamp(70px,20vw,190px)}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);display:flex;align-items:center;justify-content:center;overflow:hidden}
+#wrap{display:flex;flex-direction:column;align-items:center;gap:calc(var(--h)*.22);padding:12px;box-sizing:border-box;max-width:100%}
+#clock{display:flex;align-items:center;gap:calc(var(--h)*.12)}
+.grp{display:flex;gap:calc(var(--h)*.05)}
+.sep{display:flex;flex-direction:column;gap:calc(var(--h)*.16)}
+.sep i{width:calc(var(--h)*.07);height:calc(var(--h)*.07);border-radius:50%;background:var(--text);opacity:.7}
+.digit{position:relative;width:calc(var(--h)*.68);height:var(--h);perspective:600px;font-size:calc(var(--h)*.82);font-weight:700;line-height:var(--h)}
+.digit>div{position:absolute;left:0;width:100%;height:50%;overflow:hidden;background:var(--card);color:var(--digit);text-align:center;backface-visibility:hidden;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.digit span{position:absolute;left:0;width:100%;height:var(--h)}
+.u,.fu{top:0;border-radius:calc(var(--h)*.08) calc(var(--h)*.08) 0 0;transform-origin:bottom;border-bottom:1px solid rgba(0,0,0,.35)}
+.l,.fl{bottom:0;border-radius:0 0 calc(var(--h)*.08) calc(var(--h)*.08);transform-origin:top}
+.l span,.fl span{top:-100%}
+.fu{z-index:2}.fl{z-index:2;transform:rotateX(90deg)}
+.go .fu{animation:a .3s ease-in forwards}
+.go .fl{animation:b .3s .3s ease-out forwards}
+@keyframes a{to{transform:rotateX(-90deg)}}
+@keyframes b{to{transform:rotateX(0)}}
+#ampm{align-self:flex-end;margin-left:calc(var(--h)*.08);margin-bottom:calc(var(--h)*.04);background:var(--card);color:var(--digit);font-weight:700;font-size:calc(var(--h)*.22);padding:.25em .5em;border-radius:calc(var(--h)*.08);letter-spacing:.05em}
+#date{text-align:center;line-height:1.15}
+#day{font-size:calc(var(--h)*.3);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+#full{font-size:calc(var(--h)*.2);font-weight:500;margin-top:.15em}
+#gear{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:8px;border:0;background:rgba(255,255,255,.55);border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer;opacity:0;transition:.2s}
+body:hover #gear,#gear:focus{opacity:1}
+#panel{position:fixed;top:calc(48px + env(safe-area-inset-top,0px));right:8px;background:#fff;color:#333;font:13px system-ui,sans-serif;border-radius:12px;padding:12px;box-shadow:0 4px 20px rgba(0,0,0,.2);display:none;flex-direction:column;gap:8px;max-height:80%;overflow:auto;z-index:9}
+#panel.open{display:flex}
+#panel label{display:flex;justify-content:space-between;align-items:center;gap:14px}
+#panel input[type=color]{width:40px;height:24px;border:0;padding:0;background:none}
+#panel button{padding:6px;border:1px solid #ccc;border-radius:8px;background:#f6f6f6;cursor:pointer}
+</style></head>
+<body>
+<div id="wrap"><div id="clock"></div><div id="date"><div id="day"></div><div id="full"></div></div></div>
+<button id="gear" title="Customise">⚙</button>
+<div id="panel"></div>
+<script>
+const DEF={bg:'#FADBD8',card:'#5D3A3A',digit:'#FFF5F3',text:'#3B1F1F',h24:false,sec:false,day:true,fmt:'dmy',font:"'Poppins',system-ui,sans-serif"};
+let S={...DEF};
+try{Object.assign(S,JSON.parse(localStorage.getItem('flipclock')||'{}'))}catch(e){}
+const q=new URLSearchParams(location.search);
+['bg','card','digit','text'].forEach(k=>{if(q.get(k))S[k]='#'+q.get(k).replace('#','')});
+if(q.get('h24'))S.h24=q.get('h24')==='1';
+if(q.get('sec'))S.sec=q.get('sec')==='1';
+const save=()=>{try{localStorage.setItem('flipclock',JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id);
+let digits=[],ampmEl=null;
+
+function mk(){
+  const r=document.documentElement.style;
+  r.setProperty('--bg',S.bg);r.setProperty('--card',S.card);r.setProperty('--digit',S.digit);r.setProperty('--text',S.text);r.setProperty('--font',S.font);
+  const c=$('clock');c.innerHTML='';digits=[];
+  const groups=S.sec?3:2;
+  for(let g=0;g<groups;g++){
+    if(g){const s=document.createElement('div');s.className='sep';s.innerHTML='<i></i><i></i>';c.appendChild(s)}
+    const gr=document.createElement('div');gr.className='grp';
+    for(let i=0;i<2;i++){
+      const d=document.createElement('div');d.className='digit';
+      d.innerHTML='<div class="u"><span></span></div><div class="l"><span></span></div><div class="fu"><span></span></div><div class="fl"><span></span></div>';
+      d._v=null;gr.appendChild(d);digits.push(d);
+    }
+    c.appendChild(gr);
+  }
+  ampmEl=null;
+  if(!S.h24){ampmEl=document.createElement('div');ampmEl.id='ampm';c.appendChild(ampmEl)}
+  $('day').style.display=S.day?'':'none';
+  tick(true);
+}
+function setDigit(d,v,anim){
+  if(d._v===v)return;
+  const s=d.querySelectorAll('span');// u,l,fu,fl
+  if(!anim||d._v===null){s.forEach(x=>x.textContent=v);d._v=v;return}
+  s[0].textContent=v;s[1].textContent=d._v;s[2].textContent=d._v;s[3].textContent=v;
+  d.classList.remove('go');void d.offsetWidth;d.classList.add('go');
+  const nv=v;setTimeout(()=>{s[1].textContent=nv;d.classList.remove('go')},620);
+  d._v=v;
+}
+const MO=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DA=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function tick(first){
+  const n=new Date();let h=n.getHours();
+  const ap=h>=12?'PM':'AM';
+  if(!S.h24){h=h%12||12}
+  const p=x=>String(x).padStart(2,'0');
+  let str=p(h)+p(n.getMinutes())+(S.sec?p(n.getSeconds()):'');
+  digits.forEach((d,i)=>setDigit(d,str[i],!first));
+  if(ampmEl)ampmEl.textContent=ap;
+  $('day').textContent=DA[n.getDay()];
+  const m=MO[n.getMonth()],dd=n.getDate(),y=n.getFullYear();
+  $('full').textContent=S.fmt==='mdy'?`${m} ${dd}, ${y}`:`${dd} ${m} ${y}`;
+  document.title=`${p(h)}:${p(n.getMinutes())}`;
+}
+// settings panel
+const P=$('panel');
+function panel(){
+  const col=(k,t)=>`<label>${t}<input type=color data-k="${k}" value="${S[k]}"></label>`;
+  const chk=(k,t)=>`<label>${t}<input type=checkbox data-k="${k}" ${S[k]?'checked':''}></label>`;
+  P.innerHTML=col('bg','Background')+col('card','Flip cards')+col('digit','Digits')+col('text','Date text')+
+  chk('h24','24-hour clock')+chk('sec','Show seconds')+chk('day','Show day name')+
+  `<label>Date format<select data-k="fmt"><option value="dmy" ${S.fmt=='dmy'?'selected':''}>29 September 2026</option><option value="mdy" ${S.fmt=='mdy'?'selected':''}>September 29, 2026</option></select></label>
+   <label>Font<select data-k="font">${[["Poppins","'Poppins',system-ui,sans-serif"],["Serif","Georgia,serif"],["Mono","ui-monospace,Menlo,monospace"],["Rounded","'Trebuchet MS',system-ui,sans-serif"]].map(f=>`<option value="${f[1]}" ${S.font==f[1]?'selected':''}>${f[0]}</option>`).join('')}</select></label>
+   <button id="rst">Reset</button>`;
+  P.querySelectorAll('[data-k]').forEach(el=>el.oninput=()=>{
+    S[el.dataset.k]=el.type==='checkbox'?el.checked:el.value;save();mk()});
+  $('rst').onclick=()=>{S={...DEF};save();mk();panel()};
+}
+$('gear').onclick=()=>{panel();P.classList.toggle('open')};
+mk();setInterval(tick,250);
+</script>
+</body></html>
